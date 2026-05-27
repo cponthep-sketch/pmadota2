@@ -453,6 +453,37 @@
         .champion-node h5 { color: var(--accent); font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         .champion-node div { font-size: 18px; font-weight: 800; color: #fff; text-shadow: 0 0 10px rgba(243, 173, 42, 0.3); }
 
+        /* Announcement & Donor Styles */
+        .announcement-banner {
+            background: linear-gradient(90deg, rgba(229, 45, 45, 0.2), rgba(243, 173, 42, 0.1));
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .announcement-text { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .announcement-input { 
+            width: 100%; padding: 12px; background: var(--bg-input); border: 1px solid var(--primary); 
+            border-radius: 6px; color: white; font-size: 14px; margin-top: 8px;
+        }
+
+        .donor-section {
+            margin-top: 40px;
+            padding: 24px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .donor-title { font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; font-weight: 800; }
+        .donor-list { font-size: 14px; color: var(--text-secondary); line-height: 1.8; }
+        .donor-textarea {
+            width: 100%; height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); 
+            border-radius: 6px; color: white; font-size: 13px; margin-top: 10px; resize: vertical;
+        }
+
         @media (max-width: 600px) {
             body { padding: 10px; }
             .content { padding: 16px; }
@@ -489,8 +520,10 @@
     <div class="content">
         <!-- HOME -->
         <div id="tab-home" class="section active">
+            <div id="home-announcement"></div>
             <h2>Tournament Lineup</h2>
             <div id="home-team-grid" class="home-grid"></div>
+            <div id="home-donors"></div>
         </div>
 
         <!-- SETUP -->
@@ -555,9 +588,11 @@
 
   window.TEAMS = 6;
   window.teams = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
-  window.players = [[], [], [], [], [], []];
+  window.players = [];
   window.rrResults = {};
   window.bracketScores = {};
+  window.announcement = "";
+  window.donors = "";
   window.activeTab = 'home';
   window.isEditing = false;
 
@@ -580,15 +615,28 @@
         if (data.players) window.players = data.players;
         window.rrResults = data.rrResults || {};
         window.bracketScores = data.bracketScores || {};
+        window.announcement = data.announcement || "";
+        window.donors = data.donors || "";
         refreshUI();
     }
     statusDot.classList.add('online'); statusText.innerText = 'Connected';
   });
 
   window.updateTeamName = function(i, n) { update(ref(db, 'tournament/teams'), { [i]: n || `Team ${i+1}` }); };
-  window.updatePlayerName = function(ti, pi, n) { if(!window.players[ti]) window.players[ti]=[]; update(ref(db, `tournament/players/${ti}`), { [pi]: n }); };
-  window.setRRGameResult = function(matchK, gK, v) { update(ref(db, `tournament/rrResults/${matchK}`), { [gK]: v }); };
-  window.setRRCoinWinner = function(matchK, v) { update(ref(db, `tournament/rrResults/${matchK}`), { coin: v }); };
+  window.updateTournamentInfo = function(field, v) { update(ref(db, 'tournament'), { [field]: v }); };
+  window.updatePlayerData = function(ti, pi, field, v) { 
+    if(!window.players[ti]) window.players[ti]=[]; 
+    if(!window.players[ti][pi]) window.players[ti][pi]={ name:'', pts:0 };
+    update(ref(db, `tournament/players/${ti}/${pi}`), { [field]: v }); 
+  };
+  window.setRRGameResult = function(matchK, gK, v) { 
+    const current = (window.rrResults[matchK] || {})[gK];
+    update(ref(db, `tournament/rrResults/${matchK}`), { [gK]: current === v ? null : v }); 
+  };
+  window.setRRCoinWinner = function(matchK, v) { 
+    const current = (window.rrResults[matchK] || {}).coin;
+    update(ref(db, `tournament/rrResults/${matchK}`), { coin: current === v ? null : v }); 
+  };
 
   window.adjBScore = function(id, side, delta) {
     const rawSc = window.bracketScores[id] || {};
@@ -599,7 +647,7 @@
     update(ref(db, `tournament/bracketScores/${id}`), { [side]: newVal });
   };
 
-  window.resetAll = function() { if (confirm('ล้าง?')) set(tournamentRef, { teams: ['Team A','Team B','Team C','Team D','Team E','Team F'], players:[[],[],[],[],[],[]], rrResults: {}, bracketScores: {} }); };
+  window.resetAll = function() { if (confirm('ล้าง?')) set(tournamentRef, { teams: ['Team A','Team B','Team C','Team D','Team E','Team F'], players:[], rrResults: {}, bracketScores: {} }); };
   window.showTab = function(t) { window.activeTab = t; refreshUI(); };
 
   function refreshUI() {
@@ -618,17 +666,66 @@
     const c = document.getElementById('team-inputs'); if (!c) return;
     c.innerHTML = window.teams.map((n, i) => {
         const p = window.players[i] || [];
-        return `<div class="team-card-setup"><div class="team-input-group"><label>Team ${i+1}</label><input class="main-team-name" value="${n}" onchange="updateTeamName(${i}, this.value)"/><div class="player-inputs">${[0,1,2,3,4].map(pi => `<input class="player-input" placeholder="Player ${pi+1}" value="${p[pi]||''}" onchange="updatePlayerName(${i}, ${pi}, this.value)"/>`).join('')}</div></div></div>`;
+        return `<div class="team-card-setup">
+            <div class="team-input-group">
+                <label>Team ${i+1}</label>
+                <input class="main-team-name" value="${n}" onchange="updateTeamName(${i}, this.value)"/>
+                <div class="player-inputs-header" style="display:grid; grid-template-columns: 2fr 1fr; gap:8px; margin-bottom:4px;">
+                    <span style="font-size:9px; color:var(--text-secondary)">NAME</span>
+                    <span style="font-size:9px; color:var(--text-secondary)">PTS</span>
+                </div>
+                <div class="player-inputs-list" style="display:flex; flex-direction:column; gap:6px;">
+                    ${[0,1,2,3,4].map(pi => `
+                        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
+                            <input class="player-input" placeholder="Player ${pi+1}" value="${p[pi]?.name||''}" onchange="updatePlayerData(${i}, ${pi}, 'name', this.value)"/>
+                            <input class="player-input" type="number" placeholder="0" value="${p[pi]?.pts||0}" onchange="updatePlayerData(${i}, ${pi}, 'pts', parseInt(this.value)||0)"/>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
     }).join('');
   }
 
   function renderHome() {
     const c = document.getElementById('home-team-grid'); if (!c) return;
+    
+    // Announcement
+    const annC = document.getElementById('home-announcement');
+    if (annC) {
+        if (window.isEditing) {
+            annC.innerHTML = `<div class="announcement-banner"><label style="font-size:10px; color:var(--primary); font-weight:700;">EDIT ANNOUNCEMENT</label><input class="announcement-input" value="${window.announcement}" onchange="updateTournamentInfo('announcement', this.value)" placeholder="ใส่ข้อความประชาสัมพันธ์..."/></div>`;
+        } else if (window.announcement) {
+            annC.innerHTML = `<div class="announcement-banner"><div class="announcement-text">📢 ${window.announcement}</div></div>`;
+        } else annC.innerHTML = '';
+    }
+
+    // Teams
     c.innerHTML = window.teams.map((n, i) => {
         const p = window.players[i] || [];
-        const pList = [0,1,2,3,4].map(pi => `<div class="home-player-item">${p[pi] || `Player ${pi+1}`}</div>`).join('');
-        return `<div class="home-team-card"><div class="home-team-name">${n}</div><div class="home-player-list">${pList}</div></div>`;
+        let teamTotal = 0;
+        const pList = [0,1,2,3,4].map(pi => {
+            const player = p[pi] || { name: '', pts: 0 };
+            teamTotal += (player.pts || 0);
+            return `<div class="home-player-item">${player.name || `Player ${pi+1}`} <span style="color:var(--accent); font-size:10px; margin-left:4px;">(${player.pts || 0})</span></div>`;
+        }).join('');
+        return `
+        <div class="home-team-card">
+            <div class="home-team-name">${n}</div>
+            <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:12px;">Total Pts: ${teamTotal}</div>
+            <div class="home-player-list">${pList}</div>
+        </div>`;
     }).join('');
+
+    // Donors
+    const donC = document.getElementById('home-donors');
+    if (donC) {
+        if (window.isEditing) {
+            donC.innerHTML = `<div class="donor-section"><div class="donor-title">EDIT SPONSORS / DONORS</div><textarea class="donor-textarea" onchange="updateTournamentInfo('donors', this.value)" placeholder="ใส่ชื่อผู้สนับสนุน (เช่น ชื่อ A, ชื่อ B)...">${window.donors}</textarea></div>`;
+        } else if (window.donors) {
+            donC.innerHTML = `<div class="donor-section"><div class="donor-title">Special Thanks to our Supporters</div><div class="donor-list">${window.donors.replace(/\n/g, '<br>')}</div></div>`;
+        } else donC.innerHTML = '';
+    }
   }
 
   const ROUNDS = [[[0,1],[2,3],[4,5]], [[0,2],[1,4],[3,5]], [[0,3],[1,5],[2,4]], [[0,4],[2,5],[1,3]], [[0,5],[1,2],[3,4]]];
@@ -652,18 +749,18 @@
                         <div class="game-input-row"><span class="game-label">Game 1</span>
                             <button class="btn-game edit-only ${res.g1===a?'active':''}" onclick="setRRGameResult('${k}','g1',${a})">${window.teams[a]}</button>
                             <button class="btn-game edit-only ${res.g1===b?'active':''}" onclick="setRRGameResult('${k}','g1',${b})">${window.teams[b]}</button>
-                            ${!window.isEditing ? `<span style="font-size:11px; color:var(--accent)">${res.g1!==undefined?window.teams[res.g1]:'TBD'}</span>` : ''}
+                            ${!window.isEditing ? `<span style="font-size:11px; color:var(--accent)">${res.g1 != null ? window.teams[res.g1] : 'TBD'}</span>` : ''}
                         </div>
                         <div class="game-input-row"><span class="game-label">Game 2</span>
                             <button class="btn-game edit-only ${res.g2===a?'active':''}" onclick="setRRGameResult('${k}','g2',${a})">${window.teams[a]}</button>
                             <button class="btn-game edit-only ${res.g2===b?'active':''}" onclick="setRRGameResult('${k}','g2',${b})">${window.teams[b]}</button>
-                            ${!window.isEditing ? `<span style="font-size:11px; color:var(--accent)">${res.g2!==undefined?window.teams[res.g2]:'TBD'}</span>` : ''}
+                            ${!window.isEditing ? `<span style="font-size:11px; color:var(--accent)">${res.g2 != null ? window.teams[res.g2] : 'TBD'}</span>` : ''}
                         </div>
                         <div style="display:flex; gap:10px; align-items:center; margin-top:4px">
                             <span style="font-size:9px; color:var(--text-secondary)">Coin Winner:</span>
                             <button class="coin-toss-btn edit-only ${res.coin===a?'active':''}" onclick="setRRCoinWinner('${k}',${a})">${window.teams[a]}</button>
                             <button class="coin-toss-btn edit-only ${res.coin===b?'active':''}" onclick="setRRCoinWinner('${k}',${b})">${window.teams[b]}</button>
-                            ${!window.isEditing ? `<span style="font-size:10px; color:var(--accent)">${res.coin!==undefined?window.teams[res.coin]:'-'}</span>` : ''}
+                            ${!window.isEditing ? `<span style="font-size:10px; color:var(--accent)">${res.coin != null ? window.teams[res.coin] : '-'}</span>` : ''}
                         </div>
                     </div>
                     <div class="team-container right"><span class="score-pill ${pB>pA?'winner':pA===pB&&pB>0?'draw':'loser'}">+${pB}</span><span class="team-name">${window.teams[b]}</span></div>
@@ -681,7 +778,7 @@
         let pts=0, w=0, d=0, l=0;
         for (let a=0; a<6; a++) for (let b=a+1; b<6; b++) {
             if (a===i || b===i) {
-                const res = window.rrResults[a+'-'+b]; if (!res || (res.g1===undefined && res.g2===undefined)) continue;
+                const res = window.rrResults[a+'-'+b]; if (!res || (res.g1 == null && res.g2 == null)) continue;
                 const pI = (res.g1===i?1:0) + (res.g2===i?1:0);
                 const pO = (a===i) ? ((res.g1===b?1:0)+(res.g2===b?1:0)) : ((res.g1===a?1:0)+(res.g2===a?1:0));
                 pts += pI; if (pI===2) w++; else if (pI===1 && pO===1) d++; else if (pO===2) l++;
@@ -696,7 +793,8 @@
     const s = getSortedStandings();
     let h = `<table><thead><tr><th>#</th><th>TEAM / PLAYERS</th><th>PTS (Games)</th><th>W-D-L (Match)</th></tr></thead><tbody>`;
     s.forEach(({ i, pts, rec }, r) => { 
-        const pNames = (window.players[i] || []).filter(n => n).join(', ') || 'No players set';
+        const pData = (window.players[i] || []);
+        const pNames = pData.map(p => p?.name).filter(n => n).join(', ') || 'No players set';
         h += `<tr><td>${r+1}</td><td><div style="font-weight:600">${window.teams[i]}</div><div style="font-size:10px; color:var(--text-secondary); margin-top:4px">${pNames}</div></td><td style="color:var(--accent); font-weight:700">${pts}</td><td>${rec.w}-${rec.d}-${rec.l}</td></tr>`; 
     });
     document.getElementById('standings-table').innerHTML = h + '</tbody></table>';
@@ -740,7 +838,14 @@
     const lb2Res = getBracketRes('lb2', ub2Res.l, lb1Res.w); const gfRes = getBracketRes('gf', ub2Res.w, lb2Res.w);
     const getMatchNode = (tA, tB, res, isRR = true) => {
         let sA = '-', sB = '-', wA = false, wB = false;
-        if (isRR) { const r = res || {}; sA = (r.g1===window.teams.indexOf(tA)?1:0)+(r.g2===window.teams.indexOf(tA)?1:0); sB = (r.g1===window.teams.indexOf(tB)?1:0)+(r.g2===window.teams.indexOf(tB)?1:0); if (sA>sB) wA=true; else if(sB>sA) wB=true; }
+        if (isRR) { 
+            const r = res || {}; 
+            if (r.g1 != null || r.g2 != null) {
+                sA = (r.g1===window.teams.indexOf(tA)?1:0)+(r.g2===window.teams.indexOf(tA)?1:0); 
+                sB = (r.g1===window.teams.indexOf(tB)?1:0)+(r.g2===window.teams.indexOf(tB)?1:0); 
+                if (sA>sB) wA=true; else if(sB>sA) wB=true; 
+            }
+        }
         else { sA = res.t1 || 0; sB = res.t2 || 0; const ws = (res.isGF)?3:2; if(sA>=ws) wA=true; else if(sB>=ws) wB=true; }
         return `<div class="node-match ${wA||wB?'done':'active'}"><div class="node-team ${wA?'winner':''}"><span>${tA||'TBD'}</span><span class="node-score">${sA}</span></div><div class="node-team ${wB?'winner':''}"><span>${tB||'TBD'}</span><span class="node-score">${sB}</span></div></div>`;
     };
