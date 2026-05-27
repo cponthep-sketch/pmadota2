@@ -327,10 +327,15 @@
   import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
   // --- CONFIGURATION ---
-  // ผู้ใช้สามารถนำค่าจาก Firebase Console มาใส่ที่นี่ (apiKey, authDomain ฯลฯ)
-  // แต่สำหรับ Realtime Database สามารถใช้ databaseURL ได้โดยตรงหากตั้งกฎเป็น Public
   const firebaseConfig = {
-    databaseURL: "https://pmadota2-47472-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    apiKey: "AIzaSyCWuY0zbKMHcLfzrOzkNQsMT8DAMfDoTuI",
+    authDomain: "pmadota2-47472.firebaseapp.com",
+    databaseURL: "https://pmadota2-47472-default-rtdb.asia-southeast1.firebasedatabase.app/",
+    projectId: "pmadota2-47472",
+    storageBucket: "pmadota2-47472.firebasestorage.app",
+    messagingSenderId: "845029174426",
+    appId: "1:845029174426:web:7009becaa8200c57bfc323",
+    measurementId: "G-WKBBSWCXXJ"
   };
 
   const app = initializeApp(firebaseConfig);
