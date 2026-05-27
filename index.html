@@ -174,10 +174,26 @@
         }
         .match-card:hover { border-color: var(--border-hover); }
 
-        .match-row { display: flex; align-items: center; gap: 12px; }
-        .team-name { flex: 1; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .team-name.right { text-align: right; }
+        .match-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+        .team-container { flex: 1; display: flex; align-items: center; gap: 8px; }
+        .team-container.right { justify-content: flex-end; }
         
+        .team-name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .score-pill {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            color: var(--text-secondary);
+            min-width: 32px;
+            text-align: center;
+        }
+        .score-pill.winner { background: rgba(40, 167, 69, 0.2); color: var(--success); }
+        .score-pill.draw { background: rgba(243, 173, 42, 0.2); color: var(--accent); }
+        .score-pill.loser { background: rgba(220, 53, 69, 0.15); color: var(--danger); }
+
         .score-btns { display: flex; gap: 6px; }
         .score-btn {
             width: 44px;
@@ -197,19 +213,6 @@
         .score-btn.selected-2 { background: var(--primary); color: #fff; border-color: var(--primary); }
         .score-btn.selected-1 { background: var(--accent); color: #000; border-color: var(--accent); }
         .score-btn.selected-0 { background: #4a5568; color: #fff; border-color: #4a5568; }
-
-        .pts-badge {
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: 700;
-            background: var(--bg-card);
-            min-width: 60px;
-            text-align: center;
-        }
-        .pts-3 { color: var(--success); }
-        .pts-1 { color: var(--warning); }
-        .pts-0 { color: var(--danger); }
 
         .table-container { overflow-x: auto; margin-bottom: 24px; }
         table { width: 100%; border-collapse: collapse; }
@@ -504,17 +507,29 @@
         round.forEach(([a, b]) => {
             const r = window.swissResults[a + '-' + b] ?? null;
             const btnClass = (v) => r === v ? `score-btn selected-${v === '20' ? '2' : v === '11' ? '1' : '0'}` : 'score-btn';
+            
+            // คำนวณแต้มรายทีม
+            let ptsA = '', ptsB = '', classA = '', classB = '';
+            if (r === '20') { ptsA = '+3'; ptsB = '+0'; classA = 'winner'; classB = 'loser'; }
+            else if (r === '11') { ptsA = '+1'; ptsB = '+1'; classA = 'draw'; classB = 'draw'; }
+            else if (r === '02') { ptsA = '+0'; ptsB = '+3'; classA = 'loser'; classB = 'winner'; }
+
             div.querySelector('.round-group-body').innerHTML += `
             <div class="match-card">
                 <div class="match-row">
-                    <span class="team-name">${window.teams[a]}</span>
+                    <div class="team-container">
+                        <span class="team-name">${window.teams[a]}</span>
+                        ${ptsA ? `<span class="score-pill ${classA}">${ptsA}</span>` : ''}
+                    </div>
                     <div class="score-btns">
                         <button class="${btnClass('20')}" onclick="setResult(${a},${b},'20')">2-0</button>
                         <button class="${btnClass('11')}" onclick="setResult(${a},${b},'11')">1-1</button>
                         <button class="${btnClass('02')}" onclick="setResult(${a},${b},'02')">0-2</button>
                     </div>
-                    <span class="team-name right">${window.teams[b]}</span>
-                    <span class="pts-badge ${r === '20' ? 'pts-3' : r === '11' ? 'pts-1' : r === '02' ? 'pts-0' : ''}">${r ? (r === '20' ? '+3 / +0' : r === '11' ? '+1 / +1' : '+0 / +3') : 'VS'}</span>
+                    <div class="team-container right">
+                        ${ptsB ? `<span class="score-pill ${classB}">${ptsB}</span>` : ''}
+                        <span class="team-name">${window.teams[b]}</span>
+                    </div>
                 </div>
             </div>`;
         });
