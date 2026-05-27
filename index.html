@@ -363,10 +363,11 @@
         /* Professional Tree Map Styles */
         .roadmap-scroll-wrap { 
             overflow-x: auto; 
-            padding: 40px 0; 
+            padding: 20px 0; 
             background: #0b0e11;
             border-radius: 12px; 
             border: 1px solid var(--border);
+            position: relative;
         }
         .mindmap-tree { 
             display: flex; 
@@ -502,6 +503,81 @@
             padding: 4px 8px;
             font-size: 12px;
         }
+
+        /* TI-Themed Professional Styles */
+        .ti-node {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            width: 180px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+        }
+        .ti-node.active { border-color: var(--accent); box-shadow: 0 0 10px rgba(243, 173, 42, 0.2); }
+        .ti-node.done { border-color: var(--success); }
+        
+        .ti-team {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            height: 36px;
+            font-size: 13px;
+            position: relative;
+        }
+        .ti-team.winner { background: rgba(243, 173, 42, 0.05); color: #fff; font-weight: 700; }
+        .ti-team.winner::after {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent);
+        }
+        .ti-team span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+        .ti-score { font-family: 'Inter', monospace; color: var(--accent); font-weight: 800; width: 24px; text-align: center; }
+        .ti-divider { height: 1px; background: #30363d; }
+
+        .roadmap-container {
+            position: relative;
+            padding: 40px;
+            background: #0d1117;
+            border-radius: 12px;
+            min-height: 600px;
+            overflow: visible; /* Fix nested scrollbar */
+        }
+        .svg-connectors {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .connector-line {
+            fill: none;
+            stroke: #30363d;
+            stroke-width: 2;
+        }
+        .connector-line.active {
+            stroke: var(--accent);
+            stroke-width: 2;
+            opacity: 0.6;
+        }
+        .roadmap-stages { display: flex; gap: 80px; position: relative; z-index: 2; width: max-content; }
+
+        /* Grand Final Hero Style */
+        .gf-node {
+            width: 240px;
+            border: 2px solid var(--accent);
+            background: linear-gradient(135deg, #1c242d, #1a1608);
+        }
+        .gf-node .ti-team { height: 44px; font-size: 15px; }
+
+        .bracket-container {
+            position: relative;
+            padding: 40px;
+            background: #0d1117;
+            border-radius: 12px;
+            min-height: 600px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .bracket-wrap { display: flex; gap: 80px; position: relative; z-index: 2; width: max-content; }
 
         @media (max-width: 600px) {
             body { padding: 10px; }
@@ -873,17 +949,87 @@
     const t = [top4[0]||'1st Seed', top4[1]||'2nd Seed', top4[2]||'3rd Seed', top4[3]||'4th Seed'];
     const ub1a = getBracketRes('ub1a', t[0], t[3]); const ub1b = getBracketRes('ub1b', t[1], t[2]);
     const ub2 = getBracketRes('ub2', ub1a.w, ub1b.w); const lb2 = getBracketRes('lb2', ub2.l, getBracketRes('lb1', ub1a.l, ub1b.l).w); const gf = getBracketRes('gf', ub2.w, lb2.w);
+    
     const bm = (id, teamA, teamB, label, bo) => {
         const res = getBracketRes(id, teamA, teamB); const win = res.ws; const sc = res.sc;
         const max = (bo === 'BO5') ? 3 : 2;
-        const ctrl = (side) => `<div class="b-score-wrap"><button class="b-score-btn edit-only" onclick="adjBScore('${id}','${side}',-1)" ${sc[side]<=0?'disabled':''}>-</button><div class="b-score-box">${sc[side]}</div><button class="b-score-btn edit-only" onclick="adjBScore('${id}','${side}',1)" ${sc[side]>=max || (win && win!==side)?'disabled':''}>+</button></div>`;
-        return `<div class="b-match-card ${id==='gf'?'gf':''}"><div class="b-match-info"><span>${label}</span><span>${bo}</span></div><div class="b-match-team"><span class="b-team-name ${win==='t1'?'winner':''} ${!teamA?'tbd':''}">${teamA||'TBD'}</span>${ctrl('t1')}</div><div class="b-divider"></div><div class="b-match-team"><span class="b-team-name ${win==='t2'?'winner':''} ${!teamB?'tbd':''}">${teamB||'TBD'}</span>${ctrl('t2')}</div></div>`;
+        const ctrl = (side) => `<div class="b-score-wrap edit-only"><button class="b-score-btn" onclick="adjBScore('${id}','${side}',-1)" ${sc[side]<=0?'disabled':''}>-</button><button class="b-score-btn" onclick="adjBScore('${id}','${side}',1)" ${sc[side]>=max || (win && win!==side)?'disabled':''}>+</button></div>`;
+        return `
+        <div id="bracket-${id}" class="ti-node ${win?'done':'active'}" style="margin-bottom:20px; width:220px;">
+            <div style="font-size:9px; color:var(--text-secondary); padding:4px 12px; background:rgba(0,0,0,0.2); display:flex; justify-content:space-between; font-weight:700;">
+                <span>${label}</span><span>${bo}</span>
+            </div>
+            <div class="ti-team ${win==='t1'?'winner':''}">
+                <span class="${!teamA?'tbd':''}">${teamA||'TBD'}</span>
+                <div style="display:flex; align-items:center; gap:8px;">${ctrl('t1')}<div class="ti-score">${sc.t1}</div></div>
+            </div>
+            <div class="ti-divider"></div>
+            <div class="ti-team ${win==='t2'?'winner':''}">
+                <span class="${!teamB?'tbd':''}">${teamB||'TBD'}</span>
+                <div style="display:flex; align-items:center; gap:8px;">${ctrl('t2')}<div class="ti-score">${sc.t2}</div></div>
+            </div>
+        </div>`;
     };
-    document.getElementById('bracket-area').innerHTML = `<div class="bracket-grid"><div class="bracket-col"><div class="bracket-section-title">Upper Bracket</div>${bm('ub1a', t[0], t[3], 'UB Semifinal 1', 'BO3')}${bm('ub1b', t[1], t[2], 'UB Semifinal 2', 'BO3')}${bm('ub2', ub1a.w, ub1b.w, 'Upper Final', 'BO3')}</div><div class="bracket-col"><div class="bracket-section-title">Lower Bracket</div>${bm('lb1', ub1a.l, ub1b.l, 'LB Round 1', 'BO3')}${bm('lb2', ub2.l, getBracketRes('lb1', ub1a.l, ub1b.l).w, 'Lower Final', 'BO3')}<div class="bracket-section-title">Grand Final</div>${bm('gf', ub2.w, lb2.w, 'Grand Final', 'BO5')}</div></div>`;
+
+    document.getElementById('bracket-area').innerHTML = `
+    <div class="bracket-container">
+        <svg class="svg-connectors" id="bracket-svg"></svg>
+        <div class="bracket-wrap">
+            <div class="bracket-col"><div class="bracket-section-title">Playoffs R1</div>${bm('ub1a', t[0], t[3], 'UB SEMIFINAL 1', 'BO3')}${bm('ub1b', t[1], t[2], 'UB SEMIFINAL 2', 'BO3')}<div style="height:40px"></div>${bm('lb1', ub1a.l, ub1b.l, 'LB ROUND 1', 'BO3')}</div>
+            <div class="bracket-col" style="justify-content:center"><div class="bracket-section-title">Finals</div>${bm('ub2', ub1a.w, ub1b.w, 'UPPER FINAL', 'BO3')}<div style="height:80px"></div>${bm('lb2', ub2.l, getBracketRes('lb1', ub1a.l, ub1b.l).w, 'LOWER FINAL', 'BO3')}</div>
+            <div class="bracket-col" style="justify-content:center"><div class="bracket-section-title">Grand Final</div>${bm('gf', ub2.w, lb2.w, 'GRAND FINAL', 'BO5')}${gf.w ? `<div id="bracket-winner" style="margin-top:20px" class="ti-node gf-node"><div class="ti-team winner" style="justify-content:center; height:60px; font-size:18px">👑 ${gf.w}</div></div>` : ''}</div>
+        </div>
+    </div>`;
+
+    setTimeout(() => drawBracketConnectors(), 100);
+
     if (gf.w) {
-        let rks = [gf.w, gf.l, lb2.l, getBracketRes('lb1', ub1a.l, ub1b.l).l, window.teams[s[4].i], window.teams[s[5].i]];
+        let rks = [gf.w, gf.l, lb2.l, getBracketRes('lb1', ub1a.l, ub1b.l).l, window.teams[s[4]?.i]||'5th Place', window.teams[s[5]?.i]||'6th Place'];
         document.getElementById('champion-area').innerHTML = `<div class="champion-area-wrap"><div class="champion-banner"><h3>🏆 TOURNAMENT CHAMPION</h3><div style="font-size:28px;font-weight:800;color:#fff">${gf.w}</div></div><div class="ranking-list">${rks.map((n, i) => `<div class="rank-card"><div class="rank-num">${i+1}${['st','nd','rd','th','th','th'][i]} Place</div><div class="rank-name">${n}</div></div>`).join('')}</div></div>`;
     } else document.getElementById('champion-area').innerHTML = '';
+  }
+
+  function drawBracketConnectors() {
+    const svg = document.getElementById('bracket-svg');
+    if (!svg) return;
+    svg.innerHTML = '';
+    const container = svg.parentElement;
+    const rect = container.getBoundingClientRect();
+
+    const drawLine = (fromId, toId, type='win') => {
+        const from = document.getElementById(fromId);
+        const to = document.getElementById(toId);
+        if (!from || !to) return;
+
+        const fR = from.getBoundingClientRect();
+        const tR = to.getBoundingClientRect();
+
+        const x1 = fR.right - rect.left;
+        const y1 = fR.top + (type==='win'?fR.height*0.25:fR.height*0.75) - rect.top;
+        const x2 = tR.left - rect.left;
+        const y2 = tR.top + tR.height/2 - rect.top;
+
+        const midX = x1 + (x2 - x1)/2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+        path.setAttribute('class', `connector-line ${from.classList.contains('done') ? 'active' : ''}`);
+        if(type==='lose') path.style.strokeDasharray = "4 4";
+        svg.appendChild(path);
+    };
+
+    // UB Connectors
+    drawLine('bracket-ub1a', 'bracket-ub2', 'win');
+    drawLine('bracket-ub1b', 'bracket-ub2', 'win');
+    drawLine('bracket-ub2', 'bracket-gf', 'win');
+    
+    // LB Connectors
+    drawLine('bracket-ub1a', 'bracket-lb1', 'lose');
+    drawLine('bracket-ub1b', 'bracket-lb1', 'lose');
+    drawLine('bracket-lb1', 'bracket-lb2', 'win');
+    drawLine('bracket-ub2', 'bracket-lb2', 'lose');
+    drawLine('bracket-lb2', 'bracket-gf', 'win');
+
+    if(document.getElementById('bracket-winner')) drawLine('bracket-gf', 'bracket-winner');
   }
 
   function renderRoadmap() {
@@ -891,10 +1037,12 @@
     const s = getSortedStandings();
     const top4 = s.slice(0, 4).map(x => window.teams[x.i]);
     const t = [top4[0]||'1st Seed', top4[1]||'2nd Seed', top4[2]||'3rd Seed', top4[3]||'4th Seed'];
+    
     const ub1aRes = getBracketRes('ub1a', t[0], t[3]); const ub1bRes = getBracketRes('ub1b', t[1], t[2]);
     const ub2Res = getBracketRes('ub2', ub1aRes.w, ub1bRes.w); const lb1Res = getBracketRes('lb1', ub1aRes.l, ub1bRes.l);
     const lb2Res = getBracketRes('lb2', ub2Res.l, lb1Res.w); const gfRes = getBracketRes('gf', ub2Res.w, lb2Res.w);
-    const getMatchNode = (tA, tB, res, isRR = true) => {
+
+    const getTIPlayerNode = (tA, tB, res, isRR = true, nodeId = '') => {
         let sA = '-', sB = '-', wA = false, wB = false;
         if (isRR) { 
             const r = res || {}; 
@@ -903,19 +1051,94 @@
                 sB = (r.g1===window.teams.indexOf(tB)?1:0)+(r.g2===window.teams.indexOf(tB)?1:0); 
                 if (sA>sB) wA=true; else if(sB>sA) wB=true; 
             }
+        } else {
+            sA = res.t1 || 0; sB = res.t2 || 0; const ws = (res.isGF)?3:2;
+            if(sA>=ws) wA=true; else if(sB>=ws) wB=true;
         }
-        else { sA = res.t1 || 0; sB = res.t2 || 0; const ws = (res.isGF)?3:2; if(sA>=ws) wA=true; else if(sB>=ws) wB=true; }
-        return `<div class="node-match ${wA||wB?'done':'active'}"><div class="node-team ${wA?'winner':''}"><span>${tA||'TBD'}</span><span class="node-score">${sA}</span></div><div class="node-team ${wB?'winner':''}"><span>${tB||'TBD'}</span><span class="node-score">${sB}</span></div></div>`;
+        return `
+        <div id="${nodeId}" class="ti-node ${wA||wB?'done':'active'}">
+            <div class="ti-team ${wA?'winner':''}"><span>${tA||'TBD'}</span><span class="ti-score">${sA}</span></div>
+            <div class="ti-divider"></div>
+            <div class="ti-team ${wB?'winner':''}"><span>${tB||'TBD'}</span><span class="ti-score">${sB}</span></div>
+        </div>`;
     };
-    let h = `<div class="stage-group"><div class="stage-header"><h4>Group Stage (Round Robin)</h4></div><div style="display:flex; gap:20px">`;
-    ROUNDS.forEach((r, ri) => { h += `<div class="tree-column"><div style="font-size:9px; color:var(--accent); margin-bottom:10px; text-align:center">ROUND ${ri+1}</div>${r.map(([a,b])=>getMatchNode(window.teams[a], window.teams[b], window.rrResults[a+'-'+b])).join('')}</div><div class="tree-arrow">→</div>`; });
-    h += `</div></div><div class="stage-group"><div class="stage-header"><h4>Playoffs (Upper)</h4></div><div style="display:flex; gap:20px"><div class="tree-column">${getMatchNode(t[0], t[3], window.bracketScores['ub1a']||{}, false)}${getMatchNode(t[1], t[2], window.bracketScores['ub1b']||{}, false)}</div><div class="tree-arrow">→</div><div class="tree-column">${getMatchNode(ub1aRes.w, ub1bRes.w, window.bracketScores['ub2']||{}, false)}</div></div></div>`;
-    h += `<div class="stage-group"><div class="stage-header"><h4>Playoffs (Lower)</h4></div><div style="display:flex; gap:20px"><div class="tree-column">${getMatchNode(ub1aRes.l, ub1bRes.l, window.bracketScores['lb1']||{}, false)}</div><div class="tree-arrow">→</div><div class="tree-column">${getMatchNode(ub2Res.l, lb1Res.w, window.bracketScores['lb2']||{}, false)}</div></div></div>`;
-    h += `<div class="stage-group"><div class="stage-header"><h4>Grand Finals</h4></div><div class="tree-column">${getMatchNode(ub2Res.w, lb2Res.w, {...(window.bracketScores['gf']||{}), isGF:true}, false)}`;
-    if(gfRes.w) h += `<div class="node-match champion-node"><h5>Champion</h5><div>👑 ${gfRes.w}</div></div>`;
-    h += `</div></div>`;
+
+    let h = `
+    <div class="roadmap-container">
+        <svg class="svg-connectors" id="roadmap-svg"></svg>
+        <div class="roadmap-stages">
+            <div class="stage-group"><div class="stage-header"><h4>Group Stage</h4></div><div style="display:flex; gap:20px">`;
+            ROUNDS.forEach((r, ri) => {
+                h += `<div class="tree-column"><div style="font-size:9px; color:var(--accent); margin-bottom:10px; text-align:center">R${ri+1}</div>${r.map(([a,b], mi)=>getTIPlayerNode(window.teams[a], window.teams[b], window.rrResults[a+'-'+b], true, `rr-${ri}-${mi}`)).join('<div style="height:10px"></div>')}</div>`;
+            });
+    h += `</div></div>
+            <div class="stage-group"><div class="stage-header"><h4>Playoffs</h4></div>
+                <div style="display:flex; gap:20px">
+                    <div class="tree-column">
+                        ${getTIPlayerNode(t[0], t[3], window.bracketScores['ub1a']||{}, false, 'node-ub1a')}
+                        <div style="height:20px"></div>
+                        ${getTIPlayerNode(t[1], t[2], window.bracketScores['ub1b']||{}, false, 'node-ub1b')}
+                    </div>
+                    <div class="tree-column" style="justify-content:center">
+                        ${getTIPlayerNode(ub1aRes.w, ub1bRes.w, window.bracketScores['ub2']||{}, false, 'node-ub2')}
+                    </div>
+                </div>
+            </div>
+            <div class="stage-group"><div class="stage-header"><h4>Grand Final</h4></div>
+                <div class="tree-column" style="justify-content:center">
+                    ${getTIPlayerNode(ub2Res.w, lb2Res.w, {...(window.bracketScores['gf']||{}), isGF:true}, false, 'node-gf')}
+                    ${gfRes.w ? `<div id="node-winner" style="margin-top:20px" class="ti-node gf-node"><div class="ti-team winner" style="justify-content:center; height:60px; font-size:18px">👑 ${gfRes.w}</div></div>` : ''}
+                </div>
+            </div>
+        </div>
+    </div>`;
     c.innerHTML = h;
+
+    setTimeout(() => drawRoadmapConnectors(), 100);
   }
+
+  function drawRoadmapConnectors() {
+    const svg = document.getElementById('roadmap-svg');
+    if (!svg) return;
+    svg.innerHTML = '';
+    const container = svg.parentElement;
+    const rect = container.getBoundingClientRect();
+
+    const drawLine = (fromId, toId) => {
+        const from = document.getElementById(fromId);
+        const to = document.getElementById(toId);
+        if (!from || !to) return;
+
+        const fR = from.getBoundingClientRect();
+        const tR = to.getBoundingClientRect();
+
+        const x1 = fR.right - rect.left;
+        const y1 = fR.top + fR.height/2 - rect.top;
+        const x2 = tR.left - rect.left;
+        const y2 = tR.top + tR.height/2 - rect.top;
+
+        const midX = x1 + (x2 - x1)/2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+        path.setAttribute('class', `connector-line ${from.classList.contains('done') ? 'active' : ''}`);
+        svg.appendChild(path);
+    };
+
+    // RR Connectors
+    for(let i=0; i<4; i++) {
+        for(let j=0; j<3; j++) drawLine(`rr-${i}-${j}`, `rr-${i+1}-${j}`);
+    }
+    // Playoffs
+    drawLine('node-ub1a', 'node-ub2');
+    drawLine('node-ub1b', 'node-ub2');
+    drawLine('node-ub2', 'node-gf');
+    if(document.getElementById('node-winner')) drawLine('node-gf', 'node-winner');
+  }
+
+  window.addEventListener('resize', () => { 
+    if(window.activeTab === 'roadmap') drawRoadmapConnectors(); 
+    if(window.activeTab === 'bracket') drawBracketConnectors(); 
+  });
   showTab('home');
 </script>
 </body>
