@@ -339,7 +339,8 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  // ระบุ URL ของ database ให้ชัดเจนสำหรับ region asia-southeast1
+  const db = getDatabase(app, firebaseConfig.databaseURL);
   const tournamentRef = ref(db, 'tournament');
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
@@ -366,8 +367,13 @@
     statusText.innerText = 'Connected';
   }, (error) => {
     console.error("Firebase Error:", error);
-    statusText.innerText = 'Sync Error';
+    // แสดง Error ที่เกิดขึ้นจริงเพื่อให้แก้ได้ตรงจุด
+    statusText.innerText = 'Sync Error: ' + error.message;
     statusDot.classList.remove('online');
+    
+    if (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('denied')) {
+        statusText.innerText += ' (ตรวจสอบ Rules ใน Console)';
+    }
   });
 
   // --- ACTIONS ---
@@ -455,6 +461,15 @@
   function renderSwiss() {
     const c = document.getElementById('swiss-matches');
     if (!c) return;
+    
+    // บันทึกสถานะการย่อ/ขยายปัจจุบันไว้ก่อน (ถ้ามี)
+    const expandedStates = {};
+    for (let i = 0; i < ROUNDS.length; i++) {
+        const el = document.getElementById('rg' + i);
+        if (el) expandedStates[i] = !el.classList.contains('hidden');
+        else expandedStates[i] = (i === 0); // รอบแรกให้เปิดไว้เป็นค่าเริ่มต้น
+    }
+
     c.innerHTML = '';
     ROUNDS.forEach((round, ri) => {
         const done = round.every(([a, b]) => (window.swissResults[a + '-' + b] ?? null) !== null);
@@ -480,7 +495,12 @@
             </div>`;
         });
         div.querySelector('.round-group-body').innerHTML += '</div>';
-        if (ri > 0 && !done) div.querySelector('.round-group-body').classList.add('hidden');
+        
+        // คืนค่าสถานะการย่อ/ขยาย
+        if (!expandedStates[ri]) {
+            div.querySelector('.round-group-body').classList.add('hidden');
+        }
+        
         c.appendChild(div);
     });
   }
