@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dota 2 Tournament Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0b0e11;
+            --bg-card: #1c242d;
+            --bg-input: #12171d;
+            --primary: #e52d2d;
+            --primary-hover: #ff3e3e;
+            --accent: #f3ad2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a3aab3;
+            --border: #2d3741;
+            --border-hover: #3f4c5a;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: var(--bg-main); 
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .header {
+            padding: 24px;
+            background: linear-gradient(135deg, #1c242d 0%, #0b0e11 100%);
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #151b22;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 16px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab:hover { color: var(--text-primary); }
+        .tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .content { padding: 24px; }
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 { font-size: 20px; font-weight: 600; margin-bottom: 20px; border-left: 4px solid var(--primary); padding-left: 12px; }
+
+        .team-setup {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .team-input { display: flex; flex-direction: column; gap: 8px; }
+        .team-input label { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; }
+        .team-input input {
+            padding: 12px 16px;
+            font-size: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            transition: border-color 0.2s;
+        }
+        .team-input input:focus { outline: none; border-color: var(--primary); }
+
+        .btn-group { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            background: #252f39;
+            color: var(--text-primary);
+        }
+        .btn:hover { background: #323d49; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+        .btn-danger:hover { background: var(--danger); color: #fff; }
+
+        .info-box {
+            background: rgba(229, 45, 45, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-radius: 4px;
+        }
+
+        .match-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        .match-card:hover { border-color: var(--border-hover); }
+
+        .match-row { display: flex; align-items: center; gap: 12px; }
+        .team-name { flex: 1; font-weight: 600; font-size: 15px; }
+        .team-name.right { text-align: right; }
+        
+        .score-btns { display: flex; gap: 6px; }
+        .score-btn {
+            width: 44px;
+            height: 36px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .score-btn:hover { background: var(--border); color: #fff; }
+        .score-btn.selected-2 { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .score-btn.selected-1 { background: var(--accent); color: #000; border-color: var(--accent); }
+        .score-btn.selected-0 { background: #4a5568; color: #fff; border-color: #4a5568; }
+
+        .pts-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            background: var(--bg-card);
+            min-width: 60px;
+            text-align: center;
+        }
+        .pts-3 { color: var(--success); }
+        .pts-1 { color: var(--warning); }
+        .pts-0 { color: var(--danger); }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        th { text-align: left; padding: 12px 16px; background: #151b22; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .rank-1 { color: var(--accent); font-weight: 700; }
+        .qual-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+        .q-yes { background: rgba(40, 167, 69, 0.2); color: var(--success); }
+        .q-no { background: rgba(163, 170, 179, 0.1); color: var(--text-secondary); }
+
+        .round-group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+        .round-group-header {
+            padding: 12px 16px;
+            background: #151b22;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        .round-group-body { padding: 16px; background: var(--bg-card); }
+        .round-group-body.hidden { display: none; }
+
+        .bracket-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .b-match { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; position: relative; }
+        .b-match.grand-final { border-color: var(--accent); box-shadow: 0 0 10px rgba(243, 173, 42, 0.2); }
+        .b-team { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+        .b-team-name { font-size: 14px; color: var(--text-secondary); }
+        .b-team-name.winner { color: var(--text-primary); font-weight: 700; }
+        .b-score-area select {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .b-divider { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+
+        .champion-banner {
+            background: linear-gradient(to right, rgba(243, 173, 42, 0.2), transparent);
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 24px;
+            border-radius: 8px;
+        }
+        .champion-banner h3 { color: var(--accent); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px; }
+
+        @media (max-width: 600px) {
+            .match-row { flex-direction: column; align-items: stretch; text-align: center; }
+            .team-name.right { text-align: center; }
+            .score-btns { justify-content: center; margin: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Dota 2 Tournament Tracker</h1>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab active" onclick="showTab('setup')">⚙️ SETUP</button>
+        <button class="tab" onclick="showTab('swiss')">🔀 SWISS ROUND</button>
+        <button class="tab" onclick="showTab('standings')">📊 STANDINGS</button>
+        <button class="tab" onclick="showTab('bracket')">🏆 BRACKET</button>
+    </div>
+
+    <div class="content">
+        <!-- SETUP -->
+        <div id="tab-setup" class="section active">
+            <h2>จัดการทีม</h2>
+            <div class="team-setup" id="team-inputs"></div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="initTournament()">สร้างทัวร์นาเมนต์ ▶</button>
+                <button class="btn btn-danger" onclick="resetAll()">รีเซ็ตทั้งหมด</button>
+            </div>
+            <div class="info-box" style="margin-top:24px">
+                <strong style="color:var(--text-primary)">กฎการแข่งขัน</strong><br>
+                • <strong>Swiss Round:</strong> แข่งแบบ BO2 (ชนะ 2-0 = 3 แต้ม, เสมอ 1-1 = 1 แต้ม, แพ้ 0-2 = 0 แต้ม)<br>
+                • <strong>Playoffs:</strong> อันดับ 1-4 จะผ่านเข้าไปเล่นรอบ Double Elimination (BO3, Grand Final BO5)
+            </div>
+        </div>
+
+        <!-- SWISS -->
+        <div id="tab-swiss" class="section">
+            <h2>Swiss Round (BO2)</h2>
+            <div class="info-box">เลือกผลการแข่งขันเพื่ออัปเดตคะแนนอัตโนมัติ</div>
+            <div id="swiss-matches"></div>
+        </div>
+
+        <!-- STANDINGS -->
+        <div id="tab-standings" class="section">
+            <h2>ตารางคะแนน</h2>
+            <div id="standings-table"></div>
+            <div id="qualification-note"></div>
+        </div>
+
+        <!-- BRACKET -->
+        <div id="tab-bracket" class="section">
+            <h2>Playoffs — Double Elimination</h2>
+            <div id="champion-area"></div>
+            <div id="bracket-area"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const TEAMS = 6;
+let teams = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
+let swissResults = {};
+let bracketScores = {};
+
+function showTab(t) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const tabs = ['setup', 'swiss', 'standings', 'bracket'];
+    document.querySelectorAll('.tab')[tabs.indexOf(t)].classList.add('active');
+    document.getElementById('tab-' + t).classList.add('active');
+    if (t === 'standings') renderStandings();
+    if (t === 'bracket') renderBracket();
+}
+
+function buildSetup() {
+    const c = document.getElementById('team-inputs');
+    c.innerHTML = '';
+    for (let i = 0; i < TEAMS; i++) {
+        c.innerHTML += `<div class="team-input"><label>Team ${i + 1}</label><input id="ti${i}" value="${teams[i]}" placeholder="ชื่อทีม"/></div>`;
+    }
+}
+
+function initTournament() {
+    for (let i = 0; i < TEAMS; i++) {
+        teams[i] = document.getElementById('ti' + i).value || `Team ${String.fromCharCode(65 + i)}`;
+    }
+    swissResults = {};
+    bracketScores = {};
+    renderSwiss();
+    renderStandings();
+    renderBracket();
+    showTab('swiss');
+}
+
+function getMatches() {
+    let m = [];
+    for (let i = 0; i < TEAMS; i++) for (let j = i + 1; j < TEAMS; j++) m.push([i, j]);
+    return m;
+}
+
+function setResult(i, j, r) {
+    const k = i + '-' + j;
+    swissResults[k] = r;
+    renderSwiss();
+}
+
+function getResult(i, j) { return swissResults[i + '-' + j] ?? null; }
+
+function getPoints(i) {
+    let p = 0;
+    const m = getMatches();
+    for (const [a, b] of m) {
+        if (a === i || b === i) {
+            const r = getResult(a, b);
+            if (r === null) continue;
+            if (a === i) { if (r === '20') p += 3; else if (r === '11') p += 1; }
+            else { if (r === '02') p += 3; else if (r === '11') p += 1; }
+        }
+    }
+    return p;
+}
+
+function getRecord(i) {
+    let w = 0, d = 0, l = 0;
+    const m = getMatches();
+    for (const [a, b] of m) {
+        if (a === i || b === i) {
+            const r = getResult(a, b);
+            if (r === null) continue;
+            if (a === i) { if (r === '20') w++; else if (r === '11') d++; else l++; }
+            else { if (r === '02') w++; else if (r === '11') d++; else l++; }
+        }
+    }
+    return { w, d, l };
+}
+
+function getSortedStandings() {
+    let s = [];
+    for (let i = 0; i < TEAMS; i++) s.push({ i, pts: getPoints(i), rec: getRecord(i) });
+    s.sort((a, b) => b.pts - a.pts || (b.rec.w - a.rec.w));
+    return s;
+}
+
+const ROUNDS = [
+    [[0, 1], [2, 3], [4, 5]],
+    [[0, 2], [1, 4], [3, 5]],
+    [[0, 3], [1, 5], [2, 4]],
+    [[0, 4], [2, 5], [1, 3]],
+    [[0, 5], [1, 2], [3, 4]]
+];
+
+function renderSwiss() {
+    const c = document.getElementById('swiss-matches');
+    c.innerHTML = '';
+    ROUNDS.forEach((round, ri) => {
+        const done = round.every(([a, b]) => getResult(a, b) !== null);
+        const div = document.createElement('div');
+        div.className = 'round-group';
+        div.innerHTML = `<div class="round-group-header" onclick="toggleRound(${ri})"><span>Round ${ri + 1}</span><span style="font-size:12px;color:var(--text-secondary)">${done ? '✅ DONE' : '⏳ PENDING'}</span></div><div class="round-group-body" id="rg${ri}">`;
+        round.forEach(([a, b]) => {
+            const r = getResult(a, b);
+            const btnClass = (v) => r === v ? `score-btn selected-${v === '20' ? '2' : v === '11' ? '1' : '0'}` : 'score-btn';
+            div.querySelector('.round-group-body').innerHTML += `
+            <div class="match-card">
+                <div class="match-row">
+                    <span class="team-name">${teams[a]}</span>
+                    <div class="score-btns">
+                        <button class="${btnClass('20')}" onclick="setResult(${a},${b},'20')">2-0</button>
+                        <button class="${btnClass('11')}" onclick="setResult(${a},${b},'11')">1-1</button>
+                        <button class="${btnClass('02')}" onclick="setResult(${a},${b},'02')">0-2</button>
+                    </div>
+                    <span class="team-name right">${teams[b]}</span>
+                    <span class="pts-badge ${r === '20' ? 'pts-3' : r === '11' ? 'pts-1' : r === '02' ? 'pts-0' : ''}">${r ? (r === '20' ? '+3 / +0' : r === '11' ? '+1 / +1' : '+0 / +3') : 'VS'}</span>
+                </div>
+            </div>`;
+        });
+        div.querySelector('.round-group-body').innerHTML += '</div>';
+        if (ri > 0 && !done) div.querySelector('.round-group-body').classList.add('hidden');
+        c.appendChild(div);
+    });
+}
+
+function toggleRound(ri) { document.getElementById('rg' + ri).classList.toggle('hidden'); }
+
+function renderStandings() {
+    const s = getSortedStandings();
+    const played = Object.keys(swissResults).length;
+    let html = `<table><thead><tr><th>#</th><th>TEAM</th><th>PTS</th><th>W-D-L</th><th>QUALIFIED</th></tr></thead><tbody>`;
+    s.forEach(({ i, pts, rec }, rank) => {
+        const pass = rank < 4;
+        html += `<tr><td class="${rank < 3 ? 'rank-' + (rank + 1) : ''}">${rank + 1}</td><td style="font-weight:600">${teams[i]}</td><td style="color:var(--primary);font-weight:700">${pts}</td><td>${rec.w}-${rec.d}-${rec.l}</td><td><span class="qual-badge ${pass ? 'q-yes' : 'q-no'}">${pass ? '✓ PASS' : '✗ OUT'}</span></td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('standings-table').innerHTML = html;
+    document.getElementById('qualification-note').innerHTML = `<div style="font-size:13px;color:var(--text-secondary)">Matches recorded: ${played}/15</div>`;
+}
+
+function renderBracket() {
+    const s = getSortedStandings();
+    const top4 = s.slice(0, 4).map(x => teams[x.i]);
+    const t = [top4[0] || '1st Seed', top4[1] || '2nd Seed', top4[2] || '3rd Seed', top4[3] || '4th Seed'];
+    const c = document.getElementById('bracket-area');
+    c.innerHTML = '';
+
+    const getWinner = (id, bo = 3) => {
+        const sc = bracketScores[id]; if (!sc) return null;
+        const wins = (bo === 5) ? 3 : 2;
+        if (sc.t1 >= wins) return 't1';
+        if (sc.t2 >= wins) return 't2';
+        return null;
+    };
+
+    const bm = (id, t1, t2, label, bo = 'BO3') => {
+        const sc = bracketScores[id] || { t1: 0, t2: 0 };
+        const win = getWinner(id, bo === 'BO5' ? 5 : 3);
+        const max = bo === 'BO5' ? 3 : 2;
+        let opts1 = '', opts2 = '';
+        for (let i = 0; i <= max; i++) {
+            opts1 += `<option value="${i}" ${sc.t1 == i ? 'selected' : ''}>${i}</option>`;
+            opts2 += `<option value="${i}" ${sc.t2 == i ? 'selected' : ''}>${i}</option>`;
+        }
+        return `
+        <div class="b-match ${id === 'gf' ? 'grand-final' : ''}">
+            <div style="font-size:10px;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">${label} (${bo})</div>
+            <div class="b-team">
+                <span class="b-team-name ${win === 't1' ? 'winner' : ''}">${t1 || 'TBD'}</span>
+                <div class="b-score-area"><select onchange="setBScore('${id}','t1',this.value)">${opts1}</select></div>
+            </div>
+            <div class="b-divider"></div>
+            <div class="b-team">
+                <span class="b-team-name ${win === 't2' ? 'winner' : ''}">${t2 || 'TBD'}</span>
+                <div class="b-score-area"><select onchange="setBScore('${id}','t2',this.value)">${opts2}</select></div>
+            </div>
+        </div>`;
+    };
+
+    const res = (id) => {
+        const sc = bracketScores[id]; if (!sc) return { w: null, l: null };
+        const win = getWinner(id, id === 'gf' ? 5 : 3);
+        const tNames = bracketNames[id];
+        if (win === 't1') return { w: tNames[0], l: tNames[1] };
+        if (win === 't2') return { w: tNames[1], l: tNames[0] };
+        return { w: null, l: null };
+    };
+
+    const bracketNames = {
+        ub1a: [t[0], t[3]],
+        ub1b: [t[1], t[2]]
+    };
+
+    const ub1a = res('ub1a'), ub1b = res('ub1b');
+    bracketNames.ub2 = [ub1a.w, ub1b.w];
+    bracketNames.lb1 = [ub1a.l, ub1b.l];
+    
+    const ub2 = res('ub2'), lb1 = res('lb1');
+    bracketNames.lb2 = [ub2.l, lb1.w];
+    
+    const lb2 = res('lb2');
+    bracketNames.gf = [ub2.w, lb2.w];
+
+    const gf = res('gf');
+    if (gf.w) {
+        document.getElementById('champion-area').innerHTML = `<div class="champion-banner"><h3>🏆 TOURNAMENT CHAMPION</h3><div style="font-size:24px;font-weight:800;color:#fff">${gf.w}</div></div>`;
+    } else {
+        document.getElementById('champion-area').innerHTML = '';
+    }
+
+    c.innerHTML = `
+    <div class="bracket-wrap">
+        <div>
+            <h2>Upper Bracket</h2>
+            ${bm('ub1a', t[0], t[3], 'UB Semifinal 1')}
+            ${bm('ub1b', t[1], t[2], 'UB Semifinal 2')}
+            ${bm('ub2', ub1a.w, ub1b.w, 'UB Final')}
+        </div>
+        <div>
+            <h2>Lower Bracket</h2>
+            ${bm('lb1', ub1a.l, ub1b.l, 'LB Round 1')}
+            ${bm('lb2', ub2.l, lb1.w, 'LB Final')}
+            <h2>Grand Final</h2>
+            ${bm('gf', ub2.w, lb2.w, 'Grand Final', 'BO5')}
+        </div>
+    </div>`;
+}
+
+function setBScore(id, side, val) {
+    if (!bracketScores[id]) bracketScores[id] = { t1: 0, t2: 0 };
+    bracketScores[id][side] = parseInt(val);
+    renderBracket();
+}
+
+function resetAll() {
+    if (!confirm('ต้องการลบข้อมูลทั้งหมดหรือไม่?')) return;
+    swissResults = {}; bracketScores = {};
+    buildSetup(); showTab('setup');
+}
+
+buildSetup();
+</script>
+</body>
+</html>
