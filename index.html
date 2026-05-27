@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Tournament Tracker</title>
+    <title>Dota 2 Tournament Tracker (Real-time)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -49,7 +49,24 @@
             background: linear-gradient(135deg, #1c242d 0%, #0b0e11 100%);
             border-bottom: 1px solid var(--border);
             text-align: center;
+            position: relative;
         }
+
+        .db-status {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+        .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
 
         .header h1 {
             font-size: 24px;
@@ -251,6 +268,10 @@
 <div class="container">
     <div class="header">
         <h1>Dota 2 Tournament Tracker</h1>
+        <div class="db-status">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Connecting...</span>
+        </div>
     </div>
 
     <div class="tab-bar">
@@ -270,16 +291,17 @@
                 <button class="btn btn-danger" onclick="resetAll()">รีเซ็ตทั้งหมด</button>
             </div>
             <div class="info-box" style="margin-top:24px">
-                <strong style="color:var(--text-primary)">กฎการแข่งขัน</strong><br>
-                • <strong>Swiss Round:</strong> แข่งแบบ BO2 (ชนะ 2-0 = 3 แต้ม, เสมอ 1-1 = 1 แต้ม, แพ้ 0-2 = 0 แต้ม)<br>
-                • <strong>Playoffs:</strong> อันดับ 1-4 จะผ่านเข้าไปเล่นรอบ Double Elimination (BO3, Grand Final BO5)
+                <strong style="color:var(--text-primary)">กฎการแข่งขัน (Real-time Sync)</strong><br>
+                • ข้อมูลจะถูกเชื่อมต่อกับ Firebase อัตโนมัติ ทุกเครื่องที่เปิดลิงก์นี้จะเห็นข้อมูลเดียวกัน<br>
+                • <strong>Swiss Round:</strong> BO2 (ชนะ 2-0 = 3 แต้ม, เสมอ 1-1 = 1 แต้ม, แพ้ 0-2 = 0 แต้ม)<br>
+                • <strong>Playoffs:</strong> อันดับ 1-4 จะผ่านเข้าไปเล่นรอบ Double Elimination
             </div>
         </div>
 
         <!-- SWISS -->
         <div id="tab-swiss" class="section">
             <h2>Swiss Round (BO2)</h2>
-            <div class="info-box">เลือกผลการแข่งขันเพื่ออัปเดตคะแนนอัตโนมัติ</div>
+            <div class="info-box">เลือกผลการแข่งขันเพื่ออัปเดตคะแนนแบบ Real-time</div>
             <div id="swiss-matches"></div>
         </div>
 
@@ -299,120 +321,155 @@
     </div>
 </div>
 
-<script>
-const TEAMS = 6;
-let teams = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
-let swissResults = {};
-let bracketScores = {};
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-function showTab(t) {
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    const tabs = ['setup', 'swiss', 'standings', 'bracket'];
-    document.querySelectorAll('.tab')[tabs.indexOf(t)].classList.add('active');
-    document.getElementById('tab-' + t).classList.add('active');
-    if (t === 'standings') renderStandings();
-    if (t === 'bracket') renderBracket();
-}
+  // --- CONFIGURATION ---
+  // ผู้ใช้สามารถนำค่าจาก Firebase Console มาใส่ที่นี่ (apiKey, authDomain ฯลฯ)
+  // แต่สำหรับ Realtime Database สามารถใช้ databaseURL ได้โดยตรงหากตั้งกฎเป็น Public
+  const firebaseConfig = {
+    databaseURL: "https://pmadota2-47472-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  };
 
-function buildSetup() {
-    const c = document.getElementById('team-inputs');
-    c.innerHTML = '';
-    for (let i = 0; i < TEAMS; i++) {
-        c.innerHTML += `<div class="team-input"><label>Team ${i + 1}</label><input id="ti${i}" value="${teams[i]}" placeholder="ชื่อทีม"/></div>`;
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const tournamentRef = ref(db, 'tournament');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+
+  // Global State
+  window.TEAMS = 6;
+  window.teams = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
+  window.swissResults = {};
+  window.bracketScores = {};
+  window.activeTab = 'setup';
+
+  // --- LISTEN FOR DATA ---
+  onValue(tournamentRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        if (data.teams) window.teams = data.teams;
+        window.swissResults = data.swissResults || {};
+        window.bracketScores = data.bracketScores || {};
+        
+        // Refresh UI
+        refreshUI();
     }
-}
+    statusDot.classList.add('online');
+    statusText.innerText = 'Connected';
+  }, (error) => {
+    console.error("Firebase Error:", error);
+    statusText.innerText = 'Sync Error';
+    statusDot.classList.remove('online');
+  });
 
-function initTournament() {
-    for (let i = 0; i < TEAMS; i++) {
-        teams[i] = document.getElementById('ti' + i).value || `Team ${String.fromCharCode(65 + i)}`;
+  // --- ACTIONS ---
+  window.initTournament = function() {
+    let newTeams = [];
+    for (let i = 0; i < window.TEAMS; i++) {
+        newTeams[i] = document.getElementById('ti' + i).value || `Team ${String.fromCharCode(65 + i)}`;
     }
-    swissResults = {};
-    bracketScores = {};
-    renderSwiss();
-    renderStandings();
-    renderBracket();
-    showTab('swiss');
-}
+    
+    // Save to Firebase
+    set(tournamentRef, {
+        teams: newTeams,
+        swissResults: {},
+        bracketScores: {}
+    }).then(() => showTab('swiss'));
+  };
 
-function getMatches() {
-    let m = [];
-    for (let i = 0; i < TEAMS; i++) for (let j = i + 1; j < TEAMS; j++) m.push([i, j]);
-    return m;
-}
-
-function setResult(i, j, r) {
+  window.setResult = function(i, j, r) {
     const k = i + '-' + j;
-    swissResults[k] = r;
-    renderSwiss();
-}
+    update(ref(db, 'tournament/swissResults'), {
+        [k]: r
+    });
+  };
 
-function getResult(i, j) { return swissResults[i + '-' + j] ?? null; }
+  window.setBScore = function(id, side, val) {
+    update(ref(db, `tournament/bracketScores/${id}`), {
+        [side]: parseInt(val)
+    });
+  };
 
-function getPoints(i) {
-    let p = 0;
-    const m = getMatches();
-    for (const [a, b] of m) {
-        if (a === i || b === i) {
-            const r = getResult(a, b);
-            if (r === null) continue;
-            if (a === i) { if (r === '20') p += 3; else if (r === '11') p += 1; }
-            else { if (r === '02') p += 3; else if (r === '11') p += 1; }
-        }
+  window.resetAll = function() {
+    if (!confirm('ต้องการล้างข้อมูลทั้งหมดในฐานข้อมูลหรือไม่?')) return;
+    set(tournamentRef, {
+        teams: ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'],
+        swissResults: {},
+        bracketScores: {}
+    }).then(() => showTab('setup'));
+  };
+
+  // UI Navigation Logic
+  window.showTab = function(t) {
+    window.activeTab = t;
+    refreshUI();
+  };
+
+  function refreshUI() {
+    // Sync active tab state to DOM
+    document.querySelectorAll('.tab').forEach(b => {
+        const tabName = b.innerText.toLowerCase();
+        if (tabName.includes(window.activeTab)) b.classList.add('active');
+        else b.classList.remove('active');
+    });
+
+    document.querySelectorAll('.section').forEach(s => {
+        if (s.id === 'tab-' + window.activeTab) s.classList.add('active');
+        else s.classList.remove('active');
+    });
+
+    // Sub-renders
+    if (window.activeTab === 'setup') buildSetup();
+    if (window.activeTab === 'swiss') renderSwiss();
+    if (window.activeTab === 'standings') renderStandings();
+    if (window.activeTab === 'bracket') renderBracket();
+  }
+
+  // --- RENDERING LOGIC (Moved inside module or accessible via window) ---
+  
+  function buildSetup() {
+    const c = document.getElementById('team-inputs');
+    if (!c) return;
+    c.innerHTML = '';
+    for (let i = 0; i < window.TEAMS; i++) {
+        c.innerHTML += `<div class="team-input"><label>Team ${i + 1}</label><input id="ti${i}" value="${window.teams[i]}" placeholder="ชื่อทีม"/></div>`;
     }
-    return p;
-}
+  }
 
-function getRecord(i) {
-    let w = 0, d = 0, l = 0;
-    const m = getMatches();
-    for (const [a, b] of m) {
-        if (a === i || b === i) {
-            const r = getResult(a, b);
-            if (r === null) continue;
-            if (a === i) { if (r === '20') w++; else if (r === '11') d++; else l++; }
-            else { if (r === '02') w++; else if (r === '11') d++; else l++; }
-        }
-    }
-    return { w, d, l };
-}
-
-function getSortedStandings() {
-    let s = [];
-    for (let i = 0; i < TEAMS; i++) s.push({ i, pts: getPoints(i), rec: getRecord(i) });
-    s.sort((a, b) => b.pts - a.pts || (b.rec.w - a.rec.w));
-    return s;
-}
-
-const ROUNDS = [
+  const ROUNDS = [
     [[0, 1], [2, 3], [4, 5]],
     [[0, 2], [1, 4], [3, 5]],
     [[0, 3], [1, 5], [2, 4]],
     [[0, 4], [2, 5], [1, 3]],
     [[0, 5], [1, 2], [3, 4]]
-];
+  ];
 
-function renderSwiss() {
+  function renderSwiss() {
     const c = document.getElementById('swiss-matches');
+    if (!c) return;
     c.innerHTML = '';
     ROUNDS.forEach((round, ri) => {
-        const done = round.every(([a, b]) => getResult(a, b) !== null);
+        const done = round.every(([a, b]) => (window.swissResults[a + '-' + b] ?? null) !== null);
         const div = document.createElement('div');
         div.className = 'round-group';
-        div.innerHTML = `<div class="round-group-header" onclick="toggleRound(${ri})"><span>Round ${ri + 1}</span><span style="font-size:12px;color:var(--text-secondary)">${done ? '✅ DONE' : '⏳ PENDING'}</span></div><div class="round-group-body" id="rg${ri}">`;
+        div.innerHTML = `<div class="round-group-header" onclick="document.getElementById('rg${ri}').classList.toggle('hidden')"><span>Round ${ri + 1}</span><span style="font-size:12px;color:var(--text-secondary)">${done ? '✅ DONE' : '⏳ PENDING'}</span></div><div class="round-group-body" id="rg${ri}">`;
+        
         round.forEach(([a, b]) => {
-            const r = getResult(a, b);
+            const r = window.swissResults[a + '-' + b] ?? null;
             const btnClass = (v) => r === v ? `score-btn selected-${v === '20' ? '2' : v === '11' ? '1' : '0'}` : 'score-btn';
             div.querySelector('.round-group-body').innerHTML += `
             <div class="match-card">
                 <div class="match-row">
-                    <span class="team-name">${teams[a]}</span>
+                    <span class="team-name">${window.teams[a]}</span>
                     <div class="score-btns">
                         <button class="${btnClass('20')}" onclick="setResult(${a},${b},'20')">2-0</button>
                         <button class="${btnClass('11')}" onclick="setResult(${a},${b},'11')">1-1</button>
                         <button class="${btnClass('02')}" onclick="setResult(${a},${b},'02')">0-2</button>
                     </div>
-                    <span class="team-name right">${teams[b]}</span>
+                    <span class="team-name right">${window.teams[b]}</span>
                     <span class="pts-badge ${r === '20' ? 'pts-3' : r === '11' ? 'pts-1' : r === '02' ? 'pts-0' : ''}">${r ? (r === '20' ? '+3 / +0' : r === '11' ? '+1 / +1' : '+0 / +3') : 'VS'}</span>
                 </div>
             </div>`;
@@ -421,32 +478,55 @@ function renderSwiss() {
         if (ri > 0 && !done) div.querySelector('.round-group-body').classList.add('hidden');
         c.appendChild(div);
     });
-}
+  }
 
-function toggleRound(ri) { document.getElementById('rg' + ri).classList.toggle('hidden'); }
+  function getSortedStandings() {
+    let s = [];
+    for (let i = 0; i < window.TEAMS; i++) {
+        let p = 0;
+        let w = 0, d = 0, l = 0;
+        for (let a = 0; a < window.TEAMS; a++) {
+            for (let b = a + 1; b < window.TEAMS; b++) {
+                if (a === i || b === i) {
+                    const r = window.swissResults[a + '-' + b] ?? null;
+                    if (!r) continue;
+                    if (a === i) {
+                        if (r === '20') { p += 3; w++; } else if (r === '11') { p += 1; d++; } else l++;
+                    } else {
+                        if (r === '02') { p += 3; w++; } else if (r === '11') { p += 1; d++; } else l++;
+                    }
+                }
+            }
+        }
+        s.push({ i, pts: p, rec: { w, d, l } });
+    }
+    s.sort((a, b) => b.pts - a.pts || (b.rec.w - a.rec.w));
+    return s;
+  }
 
-function renderStandings() {
+  function renderStandings() {
     const s = getSortedStandings();
-    const played = Object.keys(swissResults).length;
     let html = `<table><thead><tr><th>#</th><th>TEAM</th><th>PTS</th><th>W-D-L</th><th>QUALIFIED</th></tr></thead><tbody>`;
     s.forEach(({ i, pts, rec }, rank) => {
         const pass = rank < 4;
-        html += `<tr><td class="${rank < 3 ? 'rank-' + (rank + 1) : ''}">${rank + 1}</td><td style="font-weight:600">${teams[i]}</td><td style="color:var(--primary);font-weight:700">${pts}</td><td>${rec.w}-${rec.d}-${rec.l}</td><td><span class="qual-badge ${pass ? 'q-yes' : 'q-no'}">${pass ? '✓ PASS' : '✗ OUT'}</span></td></tr>`;
+        html += `<tr><td class="${rank < 3 ? 'rank-' + (rank + 1) : ''}">${rank + 1}</td><td style="font-weight:600">${window.teams[i]}</td><td style="color:var(--primary);font-weight:700">${pts}</td><td>${rec.w}-${rec.d}-${rec.l}</td><td><span class="qual-badge ${pass ? 'q-yes' : 'q-no'}">${pass ? '✓ PASS' : '✗ OUT'}</span></td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('standings-table').innerHTML = html;
+    const played = Object.keys(window.swissResults).length;
     document.getElementById('qualification-note').innerHTML = `<div style="font-size:13px;color:var(--text-secondary)">Matches recorded: ${played}/15</div>`;
-}
+  }
 
-function renderBracket() {
+  function renderBracket() {
     const s = getSortedStandings();
-    const top4 = s.slice(0, 4).map(x => teams[x.i]);
+    const top4 = s.slice(0, 4).map(x => window.teams[x.i]);
     const t = [top4[0] || '1st Seed', top4[1] || '2nd Seed', top4[2] || '3rd Seed', top4[3] || '4th Seed'];
     const c = document.getElementById('bracket-area');
+    if (!c) return;
     c.innerHTML = '';
 
-    const getWinner = (id, bo = 3) => {
-        const sc = bracketScores[id]; if (!sc) return null;
+    const getWinSide = (id, bo) => {
+        const sc = window.bracketScores[id] || { t1: 0, t2: 0 };
         const wins = (bo === 5) ? 3 : 2;
         if (sc.t1 >= wins) return 't1';
         if (sc.t2 >= wins) return 't2';
@@ -454,8 +534,8 @@ function renderBracket() {
     };
 
     const bm = (id, t1, t2, label, bo = 'BO3') => {
-        const sc = bracketScores[id] || { t1: 0, t2: 0 };
-        const win = getWinner(id, bo === 'BO5' ? 5 : 3);
+        const sc = window.bracketScores[id] || { t1: 0, t2: 0 };
+        const win = getWinSide(id, bo === 'BO5' ? 5 : 3);
         const max = bo === 'BO5' ? 3 : 2;
         let opts1 = '', opts2 = '';
         for (let i = 0; i <= max; i++) {
@@ -477,31 +557,27 @@ function renderBracket() {
         </div>`;
     };
 
-    const res = (id) => {
-        const sc = bracketScores[id]; if (!sc) return { w: null, l: null };
-        const win = getWinner(id, id === 'gf' ? 5 : 3);
-        const tNames = bracketNames[id];
-        if (win === 't1') return { w: tNames[0], l: tNames[1] };
-        if (win === 't2') return { w: tNames[1], l: tNames[0] };
+    const bracketNames = { ub1a: [t[0], t[3]], ub1b: [t[1], t[2]] };
+    
+    const getRes = (id) => {
+        const wSide = getWinSide(id, id === 'gf' ? 5 : 3);
+        const names = bracketNames[id] || [null, null];
+        if (wSide === 't1') return { w: names[0], l: names[1] };
+        if (wSide === 't2') return { w: names[1], l: names[0] };
         return { w: null, l: null };
     };
 
-    const bracketNames = {
-        ub1a: [t[0], t[3]],
-        ub1b: [t[1], t[2]]
-    };
-
-    const ub1a = res('ub1a'), ub1b = res('ub1b');
+    const ub1a = getRes('ub1a'), ub1b = getRes('ub1b');
     bracketNames.ub2 = [ub1a.w, ub1b.w];
     bracketNames.lb1 = [ub1a.l, ub1b.l];
     
-    const ub2 = res('ub2'), lb1 = res('lb1');
+    const ub2 = getRes('ub2'), lb1 = getRes('lb1');
     bracketNames.lb2 = [ub2.l, lb1.w];
     
-    const lb2 = res('lb2');
+    const lb2 = getRes('lb2');
     bracketNames.gf = [ub2.w, lb2.w];
 
-    const gf = res('gf');
+    const gf = getRes('gf');
     if (gf.w) {
         document.getElementById('champion-area').innerHTML = `<div class="champion-banner"><h3>🏆 TOURNAMENT CHAMPION</h3><div style="font-size:24px;font-weight:800;color:#fff">${gf.w}</div></div>`;
     } else {
@@ -524,21 +600,11 @@ function renderBracket() {
             ${bm('gf', ub2.w, lb2.w, 'Grand Final', 'BO5')}
         </div>
     </div>`;
-}
+  }
 
-function setBScore(id, side, val) {
-    if (!bracketScores[id]) bracketScores[id] = { t1: 0, t2: 0 };
-    bracketScores[id][side] = parseInt(val);
-    renderBracket();
-}
-
-function resetAll() {
-    if (!confirm('ต้องการลบข้อมูลทั้งหมดหรือไม่?')) return;
-    swissResults = {}; bracketScores = {};
-    buildSetup(); showTab('setup');
-}
-
-buildSetup();
+  // Initial UI Setup
+  buildSetup();
 </script>
+
 </body>
 </html>
