@@ -752,7 +752,7 @@
   window.adjBScore = function(id, side, delta) {
     const rawSc = window.bracketScores[id] || {};
     const sc = { t1: rawSc.t1 || 0, t2: rawSc.t2 || 0 };
-    const max = (id === 'gf') ? 3 : 2;
+    const max = 2; // all matches BO3
     if (delta > 0 && (sc.t1 >= max || sc.t2 >= max)) return;
     const newVal = Math.max(0, Math.min(max, sc[side] + delta));
     update(ref(db, `tournament/bracketScores/${id}`), { [side]: newVal });
@@ -937,7 +937,7 @@
   function getBracketRes(id, t1, t2) {
     const rawSc = window.bracketScores[id] || {};
     const sc = { t1: rawSc.t1 || 0, t2: rawSc.t2 || 0 };
-    const wins = (id === 'gf') ? 3 : 2;
+    const wins = 2; // all Bo3
     if (sc.t1 >= wins) return { w: t1, l: t2, ws: 't1', sc };
     if (sc.t2 >= wins) return { w: t2, l: t1, ws: 't2', sc };
     return { w: null, l: null, ws: null, sc };
@@ -945,18 +945,36 @@
 
   function renderBracket() {
     const s = getSortedStandings();
+    // Top 4 seeds → UB, 5th/6th → LB
     const top4 = s.slice(0, 4).map(x => window.teams[x.i]);
     const t = [top4[0]||'1st Seed', top4[1]||'2nd Seed', top4[2]||'3rd Seed', top4[3]||'4th Seed'];
-    const ub1a = getBracketRes('ub1a', t[0], t[3]); const ub1b = getBracketRes('ub1b', t[1], t[2]);
-    const ub2 = getBracketRes('ub2', ub1a.w, ub1b.w); const lb2 = getBracketRes('lb2', ub2.l, getBracketRes('lb1', ub1a.l, ub1b.l).w); const gf = getBracketRes('gf', ub2.w, lb2.w);
-    
-    const bm = (id, teamA, teamB, label, bo) => {
+    const seed5 = window.teams[s[4]?.i] || '5th Seed';
+    const seed6 = window.teams[s[5]?.i] || '6th Seed';
+
+    // UB Round 1
+    const ub1a = getBracketRes('ub1a', t[0], t[3]);
+    const ub1b = getBracketRes('ub1b', t[1], t[2]);
+    // UB Final
+    const ubf  = getBracketRes('ubf', ub1a.w, ub1b.w);
+    // LB Round 1: แพ้ M1 vs seed5, แพ้ M2 vs seed6
+    const lbr1a = getBracketRes('lbr1a', ub1a.l, seed5);
+    const lbr1b = getBracketRes('lbr1b', ub1b.l, seed6);
+    // LB Semi
+    const lbsemi = getBracketRes('lbsemi', lbr1a.w, lbr1b.w);
+    // LB Final: แพ้จาก UBF vs ผู้ชนะ LB Semi
+    const lbf  = getBracketRes('lbf', ubf.l, lbsemi.w);
+    // Grand Final
+    const gf   = getBracketRes('gf', ubf.w, lbf.w);
+
+    const bm = (id, teamA, teamB, label, bo, isLB=false) => {
         const res = getBracketRes(id, teamA, teamB); const win = res.ws; const sc = res.sc;
         const max = (bo === 'BO5') ? 3 : 2;
         const ctrl = (side) => `<div class="b-score-wrap edit-only"><button class="b-score-btn" onclick="adjBScore('${id}','${side}',-1)" ${sc[side]<=0?'disabled':''}>-</button><button class="b-score-btn" onclick="adjBScore('${id}','${side}',1)" ${sc[side]>=max || (win && win!==side)?'disabled':''}>+</button></div>`;
+        const borderStyle = isLB ? 'border-color:#8b3a2a;' : '';
+        const labelColor = isLB ? 'color:#e07060;' : '';
         return `
-        <div id="bracket-${id}" class="ti-node ${win?'done':'active'}" style="margin-bottom:20px; width:220px;">
-            <div style="font-size:9px; color:var(--text-secondary); padding:4px 12px; background:rgba(0,0,0,0.2); display:flex; justify-content:space-between; font-weight:700;">
+        <div id="bracket-${id}" class="ti-node ${win?'done':'active'}" style="margin-bottom:16px; width:220px; ${borderStyle}">
+            <div style="font-size:9px; padding:4px 12px; background:rgba(0,0,0,0.2); display:flex; justify-content:space-between; font-weight:700; ${labelColor}">
                 <span>${label}</span><span>${bo}</span>
             </div>
             <div class="ti-team ${win==='t1'?'winner':''}">
@@ -971,21 +989,56 @@
         </div>`;
     };
 
+    const sectionTitle = (label, isLB=false) =>
+        `<div class="bracket-section-title" style="${isLB?'color:#e07060; border-color:rgba(224,112,96,0.3);':''}">${label}</div>`;
+
     document.getElementById('bracket-area').innerHTML = `
     <div class="bracket-container">
         <svg class="svg-connectors" id="bracket-svg"></svg>
-        <div class="bracket-wrap">
-            <div class="bracket-col"><div class="bracket-section-title">Playoffs R1</div>${bm('ub1a', t[0], t[3], 'UB SEMIFINAL 1', 'BO3')}${bm('ub1b', t[1], t[2], 'UB SEMIFINAL 2', 'BO3')}<div style="height:40px"></div>${bm('lb1', ub1a.l, ub1b.l, 'LB ROUND 1', 'BO3')}</div>
-            <div class="bracket-col" style="justify-content:center"><div class="bracket-section-title">Finals</div>${bm('ub2', ub1a.w, ub1b.w, 'UPPER FINAL', 'BO3')}<div style="height:80px"></div>${bm('lb2', ub2.l, getBracketRes('lb1', ub1a.l, ub1b.l).w, 'LOWER FINAL', 'BO3')}</div>
-            <div class="bracket-col" style="justify-content:center"><div class="bracket-section-title">Grand Final</div>${bm('gf', ub2.w, lb2.w, 'GRAND FINAL', 'BO5')}${gf.w ? `<div id="bracket-winner" style="margin-top:20px" class="ti-node gf-node"><div class="ti-team winner" style="justify-content:center; height:60px; font-size:18px">👑 ${gf.w}</div></div>` : ''}</div>
+        <div class="bracket-wrap" style="align-items:flex-start; gap:12px;">
+
+            <!-- Col 1: UB R1 (top) + LB R1 (bottom) -->
+            <div class="bracket-col" style="gap:12px;">
+                ${sectionTitle('UB Round 1')}
+                ${bm('ub1a', t[0], t[3], 'UB MATCH 1', 'BO3')}
+                ${bm('ub1b', t[1], t[2], 'UB MATCH 2', 'BO3')}
+                <div style="height:28px; border-left:1px dashed rgba(224,112,96,0.2); margin-left:8px;"></div>
+                ${sectionTitle('LB Round 1', true)}
+                ${bm('lbr1a', ub1a.l, seed5, 'LB MATCH A', 'BO3', true)}
+                ${bm('lbr1b', ub1b.l, seed6, 'LB MATCH B', 'BO3', true)}
+            </div>
+
+            <!-- Col 2: UB Final (top) + LB Semi (bottom) -->
+            <div class="bracket-col" style="gap:12px; padding-top:52px;">
+                ${sectionTitle('Upper Final')}
+                ${bm('ubf', ub1a.w, ub1b.w, 'UB FINAL', 'BO3')}
+                <div style="height:28px; border-left:1px dashed rgba(224,112,96,0.2); margin-left:8px;"></div>
+                ${sectionTitle('LB Semifinal', true)}
+                ${bm('lbsemi', lbr1a.w, lbr1b.w, 'LB SEMIFINAL', 'BO3', true)}
+            </div>
+
+            <!-- Col 3: LB Final -->
+            <div class="bracket-col" style="gap:12px; padding-top:220px;">
+                ${sectionTitle('LB Final', true)}
+                ${bm('lbf', ubf.l, lbsemi.w, 'LB FINAL', 'BO3', true)}
+            </div>
+
+            <!-- Col 4: Grand Final -->
+            <div class="bracket-col" style="gap:12px; padding-top:160px;">
+                ${sectionTitle('Grand Final')}
+                ${bm('gf', ubf.w, lbf.w, 'GRAND FINAL', 'BO3')}
+                ${gf.w ? `<div id="bracket-winner" class="ti-node gf-node" style="margin-top:8px;"><div class="ti-team winner" style="justify-content:center; height:56px; font-size:17px;">👑 ${gf.w}</div></div>` : ''}
+            </div>
+
         </div>
     </div>`;
 
     setTimeout(() => drawBracketConnectors(), 100);
 
     if (gf.w) {
-        let rks = [gf.w, gf.l, lb2.l, getBracketRes('lb1', ub1a.l, ub1b.l).l, window.teams[s[4]?.i]||'5th Place', window.teams[s[5]?.i]||'6th Place'];
-        document.getElementById('champion-area').innerHTML = `<div class="champion-area-wrap"><div class="champion-banner"><h3>🏆 TOURNAMENT CHAMPION</h3><div style="font-size:28px;font-weight:800;color:#fff">${gf.w}</div></div><div class="ranking-list">${rks.map((n, i) => `<div class="rank-card"><div class="rank-num">${i+1}${['st','nd','rd','th','th','th'][i]} Place</div><div class="rank-name">${n}</div></div>`).join('')}</div></div>`;
+        const rks = [gf.w, gf.l, lbf.l, lbsemi.l, lbr1a.l||lbr1b.l||'5th Place', lbr1b.l||lbr1a.l||'6th Place']
+            .filter((v,i,a)=>a.indexOf(v)===i); // dedupe just in case
+        document.getElementById('champion-area').innerHTML = `<div class="champion-area-wrap"><div class="champion-banner"><h3>🏆 TOURNAMENT CHAMPION</h3><div style="font-size:28px;font-weight:800;color:#fff">${gf.w}</div></div><div class="ranking-list">${rks.map((n, i) => `<div class="rank-card"><div class="rank-num">${i+1}${['st','nd','rd','th','th','th'][i]||'th'} Place</div><div class="rank-name">${n||'-'}</div></div>`).join('')}</div></div>`;
     } else document.getElementById('champion-area').innerHTML = '';
   }
 
@@ -1005,7 +1058,7 @@
         const tR = to.getBoundingClientRect();
 
         const x1 = fR.right - rect.left;
-        const y1 = fR.top + (type==='win'?fR.height*0.25:fR.height*0.75) - rect.top;
+        const y1 = fR.top + (type==='win' ? fR.height*0.25 : fR.height*0.75) - rect.top;
         const x2 = tR.left - rect.left;
         const y2 = tR.top + tR.height/2 - rect.top;
 
@@ -1013,23 +1066,30 @@
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
         path.setAttribute('class', `connector-line ${from.classList.contains('done') ? 'active' : ''}`);
-        if(type==='lose') path.style.strokeDasharray = "4 4";
+        if (type === 'lose') {
+            path.style.strokeDasharray = '4 4';
+            path.style.stroke = '#8b3a2a';
+        }
         svg.appendChild(path);
     };
 
-    // UB Connectors
-    drawLine('bracket-ub1a', 'bracket-ub2', 'win');
-    drawLine('bracket-ub1b', 'bracket-ub2', 'win');
-    drawLine('bracket-ub2', 'bracket-gf', 'win');
-    
-    // LB Connectors
-    drawLine('bracket-ub1a', 'bracket-lb1', 'lose');
-    drawLine('bracket-ub1b', 'bracket-lb1', 'lose');
-    drawLine('bracket-lb1', 'bracket-lb2', 'win');
-    drawLine('bracket-ub2', 'bracket-lb2', 'lose');
-    drawLine('bracket-lb2', 'bracket-gf', 'win');
+    // UB win flow
+    drawLine('bracket-ub1a',  'bracket-ubf',    'win');
+    drawLine('bracket-ub1b',  'bracket-ubf',    'win');
+    drawLine('bracket-ubf',   'bracket-gf',     'win');
 
-    if(document.getElementById('bracket-winner')) drawLine('bracket-gf', 'bracket-winner');
+    // UB losers drop to LB R1
+    drawLine('bracket-ub1a',  'bracket-lbr1a',  'lose');
+    drawLine('bracket-ub1b',  'bracket-lbr1b',  'lose');
+
+    // LB flow
+    drawLine('bracket-lbr1a', 'bracket-lbsemi', 'win');
+    drawLine('bracket-lbr1b', 'bracket-lbsemi', 'win');
+    drawLine('bracket-lbsemi','bracket-lbf',    'win');
+    drawLine('bracket-ubf',   'bracket-lbf',    'lose');
+    drawLine('bracket-lbf',   'bracket-gf',     'win');
+
+    if (document.getElementById('bracket-winner')) drawLine('bracket-gf', 'bracket-winner', 'win');
   }
 
   function renderRoadmap() {
