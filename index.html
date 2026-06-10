@@ -915,7 +915,9 @@
                 const res = window.rrResults[a+'-'+b]; if (!res || (res.g1 == null && res.g2 == null)) continue;
                 const pI = (res.g1===i?1:0) + (res.g2===i?1:0);
                 const pO = (a===i) ? ((res.g1===b?1:0)+(res.g2===b?1:0)) : ((res.g1===a?1:0)+(res.g2===a?1:0));
-                pts += pI; if (pI===2) w++; else if (pI===1 && pO===1) d++; else if (pO===2) l++;
+                if (pI===2) { w++; pts += 3; }
+                else if (pI===1 && pO===1) { d++; pts += 1; }
+                else if (pO===2) { l++; }
             }
         }
         s.push({ i, pts, rec: { w, d, l } });
