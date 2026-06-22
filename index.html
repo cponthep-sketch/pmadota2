@@ -294,7 +294,6 @@
     </div>
 
     <div class="content">
-        <!-- HOME -->
         <div id="tab-home" class="section active">
             <div id="home-announcement"></div>
             <h2>Tournament Lineup</h2>
@@ -302,7 +301,6 @@
             <div id="home-donors"></div>
         </div>
 
-        <!-- SETUP -->
         <div id="tab-setup" class="section">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
                 <h2>รายชื่อผู้เล่นทั้งหมด (Pool)</h2>
@@ -317,14 +315,12 @@
             </div>
         </div>
 
-        <!-- ROUND ROBIN -->
         <div id="tab-roundrobin" class="section">
             <h2>Round Robin (BO2)</h2>
             <div class="info-box">บันทึกผล Game 1 & 2</div>
             <div id="rr-matches"></div>
         </div>
 
-        <!-- RESULTS RR -->
         <div id="tab-results" class="section">
             <h2>Results Round Robin (Bo2)</h2>
             <div class="info-box edit-only" style="border-left-color:var(--accent); background:rgba(243,173,42,0.1)">
@@ -333,7 +329,6 @@
             <div class="table-container"><div id="standings-table"></div></div>
         </div>
 
-        <!-- BRACKET -->
         <div id="tab-bracket" class="section">
             <div id="champion-area"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
@@ -540,8 +535,8 @@
         }
         s.push({ i, pts, rec: { w, d, l }, tb: window.tiebreakers[i] || 0 }); // Inject Tiebreaker Score
     }
-    // Update sort to check: Points -> Wins -> Tiebreaker Score -> Default
-    return s.sort((a,b) => b.pts - a.pts || b.rec.w - a.rec.w || b.tb - a.tb);
+    // Update sort to check: Points -> Tiebreaker Score -> Wins
+    return s.sort((a,b) => b.pts - a.pts || b.tb - a.tb || b.rec.w - a.rec.w);
   }
 
   function renderResults() {
